@@ -1,8 +1,6 @@
-flask
-python-dotenv
+Flask
 gspread
 google-auth
 google-auth-oauthlib
-google-api-python-client
 google-generativeai
-tenacity
+python-dotenv

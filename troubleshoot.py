@@ -1,74 +1,35 @@
 import sys
-import ssl
-import socket
-import requests
-from requests.adapters import HTTPAdapter
-from urllib3 import PoolManager
+import subprocess
 
-class ForceTLSV12Adapter(HTTPAdapter):
-    """A custom HTTP adapter to force TLS 1.2."""
-    def __init__(self, *args, **kwargs):
-        self.ssl_context = ssl.create_default_context()
-        self.ssl_context.minimum_version = ssl.TLSVersion.TLSv1_2
-        self.ssl_context.maximum_version = ssl.TLSVersion.TLSv1_2
-        super().__init__(*args, **kwargs)
+print("--- Python Environment Diagnostic ---")
 
-    def init_poolmanager(self, connections, maxsize, block=False):
-        self.poolmanager = PoolManager(
-            num_pools=connections,
-            maxsize=maxsize,
-            block=block,
-            ssl_context=self.ssl_context
-        )
+# Print Python executable path
+print(f"[*] Python Executable: {sys.executable}")
 
-def check_ssl():
-    """
-    Performs a series of checks to diagnose SSL/TLS issues.
-    """
-    print("--- SSL/TLS Troubleshooting ---")
-    print(f"Python version: {sys.version}")
-    print(f"SSL version: {ssl.OPENSSL_VERSION}")
+# Print Python version
+print(f"[*] Python Version: {sys.version}")
 
-    # --- Check 1: Standard connection to Google ---
-    try:
-        print("\n[1] Attempting standard connection to https://www.google.com...")
-        response = requests.get("https://www.google.com", timeout=15)
-        if response.status_code == 200:
-            print("[+] SUCCESS: Standard connection to Google works.")
-        else:
-            print(f"[-] WARNING: Received status code {response.status_code} from Google.")
-    except requests.exceptions.RequestException as e:
-        print(f"[-] FAILURE: Could not connect to Google. Error: {e}")
-        print("    This indicates a potential network issue, proxy problem, or a firewall blocking the connection.")
+# Try to import the problematic package
+print("\n[*] Attempting to import 'google.genai'...")
+try:
+    import google.genai
+    print("[+] SUCCESS: 'google.genai' imported successfully.")
+    print(f"    - Location: {google.genai.__file__}")
+except ImportError as e:
+    print(f"[!] FAILED: Could not import 'google.genai'.")
+    print(f"    - Error: {e}")
+except Exception as e:
+    print(f"[!] FAILED: An unexpected error occurred during import.")
+    print(f"    - Error: {e}")
 
-    # --- Check 2: Connection with forced TLS 1.2 ---
-    try:
-        print("\n[2] Attempting connection with forced TLS 1.2...")
-        session = requests.Session()
-        session.mount("https://", ForceTLSV12Adapter())
-        response = session.get("https://www.google.com", timeout=15)
-        if response.status_code == 200:
-            print("[+] SUCCESS: Connection with forced TLS 1.2 works.")
-        else:
-            print(f"[-] WARNING: Received status code {response.status_code} with forced TLS 1.2.")
-    except requests.exceptions.RequestException as e:
-        print(f"[-] FAILURE: Could not connect with forced TLS 1.2. Error: {e}")
-        print("    This could indicate that your system's SSL libraries do not support TLS 1.2, which is unlikely but possible.")
 
-    # --- Check 3: Detailed SSL socket connection ---
-    try:
-        print("\n[3] Attempting a direct SSL socket connection to google.com:443...")
-        context = ssl.create_default_context()
-        with socket.create_connection(("www.google.com", 443), timeout=15) as sock:
-            with context.wrap_socket(sock, server_hostname="www.google.com") as ssock:
-                print("[+] SUCCESS: Direct SSL socket connection established.")
-                print(f"    - Protocol: {ssock.version()}")
-                print(f"    - Cipher: {ssock.cipher()}")
-    except Exception as e:
-        print(f"[-] FAILURE: Direct SSL socket connection failed. Error: {e}")
-        print("    This is a strong indicator of a low-level SSL/TLS issue on your system or network.")
+# List all installed packages in this environment
+print("\n[*] Listing installed packages for this environment...")
+try:
+    reqs = subprocess.check_output([sys.executable, '-m', 'pip', 'list'])
+    print(reqs.decode())
+except Exception as e:
+    print(f"[!] FAILED: Could not list packages using 'pip list'.")
+    print(f"    - Error: {e}")
 
-    print("\n--- End of Troubleshooting ---")
-
-if __name__ == "__main__":
-    check_ssl()
+print("--- End of Diagnostic ---")

@@ -37,8 +37,8 @@
 
     <main class="container">
         <div class="bg-light p-5 rounded">
-            <h1>AnyAI Video言語化 (Google Drive)</h1>
-            <p class="lead">Google Drive上に保存してある動画を言語化します。</p>
+            <h1>AnyAI Video言語化(Local)</h1>
+            <p class="lead">'local_video'上に保存してある動画を言語化します。</p>
             <form id="runner-form">
                 
                 <div class="mb-3">
@@ -52,7 +52,7 @@
                         <input type="text" class="form-control" id="source-sheet-name" value="Sheet1">
                     </div>
                     <div class="col-md-6">
-                        <label for="video-col-letter" class="form-label">Video URL Column</label>
+                        <label for="video-col-letter" class="form-label">Video Column</label>
                         <input type="text" class="form-control" id="video-col-letter" value="B">
                     </div>
                 </div>
@@ -111,7 +111,6 @@
         const logContainer = document.getElementById('log-container');
         const runButton = document.getElementById('run-button');
         const stopButton = document.getElementById('stop-button');
-        let currentProcessId = null;
 
         function log(message, isError = false) {
             const timestamp = new Date().toLocaleTimeString();
@@ -125,19 +124,11 @@
         }
 
         stopButton.addEventListener('click', async () => {
-            if (!currentProcessId) {
-                log('-> No active analysis to stop.', true);
-                return;
-            }
             log('-> Sending stop signal...');
             stopButton.disabled = true;
             try {
-                await fetch('/stop-analysis', { 
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ process_id: currentProcessId }),
-                });
-                log('-> Stop signal sent. The analysis has been terminated.');
+                await fetch('/stop-analysis', { method: 'POST' });
+                log('-> Stop signal sent. The script will halt after the current row is finished.');
             } catch (error) {
                 log(`-> Error sending stop signal: ${error}`, true);
             }
@@ -158,7 +149,8 @@
                 workers: document.getElementById('workers').value,
             };
 
-            log('-> Analysis request sent. Waiting for logs...');
+            logContainer.innerHTML = '';
+            log('-> Starting analysis...');
             runButton.disabled = true;
             runButton.textContent = 'Running...';
             stopButton.disabled = false;
@@ -170,48 +162,39 @@
                     body: JSON.stringify(formData),
                 });
 
-                const result = await response.json();
-
                 if (!response.ok) {
-                    log(`Error starting analysis: ${result.error}`, true);
-                    finalizeUI();
+                    const errorData = await response.json();
+                    log(`HTTP Error: ${response.status} - ${errorData.error}`, true);
                     return;
                 }
-                
-                currentProcessId = result.process_id;
-                log(`-> Backend process started successfully (ID: ${currentProcessId}). Streaming logs...`);
-                
-                // --- Setup EventSource for log streaming ---
-                const eventSource = new EventSource(`/stream-logs?process_id=${currentProcessId}`);
 
-                eventSource.onmessage = function(event) {
-                    log(event.data);
-                };
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
 
-                eventSource.addEventListener('error', function(event) {
-                    log('-> Log stream connection lost. The process may have finished or an error occurred.', true);
-                    eventSource.close();
-                    finalizeUI();
-                });
-                
-                eventSource.addEventListener('complete', function(event) {
-                    log(`-> ${event.data}`);
-                    eventSource.close();
-                    finalizeUI();
-                });
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    
+                    const chunk = decoder.decode(value);
+                    const lines = chunk.split('\n\n');
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const message = line.substring(6).trim();
+                            if (message) {
+                                log(message, message.includes('ERROR') || message.includes('FATAL'));
+                            }
+                        }
+                    }
+                }
 
             } catch (error) {
                 log(`Network or server error: ${error}`, true);
-                finalizeUI();
+            } finally {
+                runButton.disabled = false;
+                runButton.textContent = 'Run Analysis';
+                stopButton.disabled = true;
             }
         });
-
-        function finalizeUI() {
-            runButton.disabled = false;
-            runButton.textContent = 'Run Analysis';
-            stopButton.disabled = true;
-            currentProcessId = null;
-        }
     </script>
 </body>
 </html>
