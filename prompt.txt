@@ -1,0 +1,54 @@
+description: >
+  テキスト由来の観測（ASR/OCR/検出ログ/メタ情報など）から、動画をテキストだけで再合成可能な
+  VRT（Video Reconstruction Transcript）を生成する。Iスナップショット→Δ更新→イベントの
+  3形態で10ms量子化の時間軸を記述し、音声（音素/韻律/BGM/SFX）・映像（カメラ/被写体/色/効果）・
+  グラフィック（テロップ/図版）・編集（トランジション/速度）を高解像度で復元可能にする。
+
+settings:
+  time_quantization_ms: 10         # 時間量子化（上限10ms）
+  max_I_interval_ms: 1000          # 任意点復元のためのI間隔上限
+  output_mode: jsonl               # 出力はJSON Lines（1行=1レコード）
+  decimal_places:
+    time_ms: 0
+    float_default: 3
+  require_evidence: true           # 各観測に証拠（evidence）必須
+  strict_json_only: true           # 説明文/前置き/コードフェンス禁止
+  unknown_policy:                   # 不確実時の扱い
+    fill: "unknown"                # 値は"unknown"（またはnull許容フィールドはnull）
+    emit_with_low_confidence: true # conf<0.5でも記録可（confidenceは必須）
+  priority_rules:                   # 衝突時の優先度例
+    - name: price_conflict
+      rule: "OCR数値と音声数値が矛盾→表記価格(OCR)を優先。音声は補助根拠として保持。"
+    - name: timing_alignment
+      rule: "モーダル間の時刻は±100–500ms以内に同期、外れ値は別イベント扱い。"
+  units_and_spaces:
+    color_space_default: "BT.709"
+    currency_default: "JPY"
+    fps_default: 29.97
+    sample_rate_default: 48000
+
+messages:
+  - role: system
+    content: |
+      あなたはVideoをテキストデータに超高解像度で変換するエージェントです。
+      出力は**厳格JSONのみ**（推奨：JSON Lines）。説明文、余計なテキスト、コードフェンスは禁止。
+      ルール：
+      1) 時間はms単位、量子化は{{time_quantization_ms}}ms以内。任意点復元のためI間隔は{{max_I_interval_ms}}ms以下。
+      2) I（スナップショット）→Δ（差分更新）→event（マイクロイベント）の3種レコードに限定。
+      3) すべての推論には evidence（テキスト断片/フレーム範囲/由来モーダル）と confidence[0,1] を必須付与。
+      4) 不確実な値は推測しない。unknown_policyに従う（"unknown"またはnull）。
+      5) スキーマ外キーは禁止。json_schemaに適合しない出力は禁止。
+      6) ハルシネーション抑止：入力根拠のない生成は禁止。常にsource_modalityと根拠を示す。
+
+  - role: user
+    content: |
+      # タスク
+      0) 入力された動画について完全に理解し、以下の全てのタスクを超忠実かつステップバイステップで実行
+      1) VRTヘッダ(I)を生成し、以降はΔ/イベントで更新。
+      2) カメラ/構図/照明/色/スピード/グレイン等の映像パラメータを復元。
+      3) テロップ/図版のフォント・レイアウト・装飾・アニメを復元。
+      4) 話者ごとの音素列、韻律、BGM（テンポ/キー/コード/構成）、SFXを復元。
+      5) 価格/CTA/主張/比較/表情/ジェスチャ等のマイクロイベントを10–100ms粒度で起票。
+      6) 競合モーダルの衝突はpriority_rulesで解決し、evidenceに根拠を併記。
+      # 出力
+      json_schemaに厳密に適合する**JSON Lines**のみを返すこと（前置き・後置き禁止）。

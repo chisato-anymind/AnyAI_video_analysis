@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GAS Batch Runner</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            padding-top: 4.5rem;
+        }
+        #log-container {
+            height: 400px;
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 0.25rem;
+            padding: 1rem;
+            overflow-y: scroll;
+            font-family: monospace;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-md navbar-dark fixed-top bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">GAS Batch Runner</a>
+        </div>
+    </nav>
+
+    <main class="container">
+        <div class="bg-light p-5 rounded">
+            <h1>GAS実行設定</h1>
+            <p class="lead">Google Apps Scriptをバッチ処理で連続実行します。</p>
+            <form id="runner-form">
+                <div class="mb-3">
+                    <label for="gas-url" class="form-label">GAS Web App URL</label>
+                    <input type="url" class="form-control" id="gas-url" value="https://script.google.com/macros/s/AKfycbxCWOeVHewnDrH5WNVqEJJp34mj2DZJrvcnC4yuouKLdcHpzvXdvOwrhd6BG0q1yXkZ/exec" required>
+                </div>
+                <div class="mb-3">
+                    <label for="sheet-id" class="form-label">Spreadsheet ID</label>
+                    <input type="text" class="form-control" id="sheet-id" value="19g2vepsYjMHJc5RUNnfO9UXILU7fbPpxtwc5-JddO4M" required>
+                </div>
+                <div class="mb-3">
+                    <label for="token" class="form-label">Token</label>
+                    <input type="text" class="form-control" id="token" value="AnyAIDashboard_ATT" required>
+                </div>
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label for="start-row" class="form-label">開始行</label>
+                        <input type="number" class="form-control" id="start-row" value="5" required>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label for="end-row" class="form-label">終了行</label>
+                        <input type="number" class="form-control" id="end-row" value="4004" required>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label for="batch-size" class="form-label">バッチサイズ</label>
+                        <input type="number" class="form-control" id="batch-size" value="20" required>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary">実行</button>
+                <button type="button" class="btn btn-secondary" id="stop-button" disabled>停止</button>
+            </form>
+        </div>
+
+        <div class="mt-4">
+            <h2>実行ログ</h2>
+            <div id="log-container"></div>
+        </div>
+    </main>
+
+    <script>
+        const form = document.getElementById('runner-form');
+        const logContainer = document.getElementById('log-container');
+        const executeButton = form.querySelector('button[type="submit"]');
+        const stopButton = document.getElementById('stop-button');
+
+        let shouldStop = false;
+
+        function log(message, color = 'black') {
+            const timestamp = new Date().toLocaleTimeString();
+            logContainer.innerHTML += `<span style="color: ${color};">[${timestamp}] ${message}</span>\n`;
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+
+        stopButton.addEventListener('click', () => {
+            shouldStop = true;
+            log('停止信号を送信しました。現在のバッチ処理が完了後に停止します。', 'orange');
+            stopButton.disabled = true;
+        });
+
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            
+            const gasUrl = document.getElementById('gas-url').value;
+            const spreadsheetId = document.getElementById('sheet-id').value;
+            const token = document.getElementById('token').value;
+            const startRow = parseInt(document.getElementById('start-row').value, 10);
+            const lastRow = parseInt(document.getElementById('end-row').value, 10);
+            const batchSize = parseInt(document.getElementById('batch-size').value, 10);
+
+            if (!gasUrl || !spreadsheetId || !token || isNaN(startRow) || isNaN(lastRow) || isNaN(batchSize)) {
+                log('すべてのフィールドを正しく入力してください。', 'red');
+                return;
+            }
+
+            logContainer.innerHTML = '';
+            log('処理を開始します...');
+            executeButton.disabled = true;
+            stopButton.disabled = false;
+            shouldStop = false;
+
+            let successCount = 0;
+            let errorCount = 0;
+
+            try {
+                for (let start = startRow; start <= lastRow; start += batchSize) {
+                    if (shouldStop) {
+                        log('処理がユーザーによって中断されました。', 'orange');
+                        break;
+                    }
+
+                    const end = Math.min(start + batchSize - 1, lastRow);
+                    log(`バッチ処理中: ${start}行目から${end}行目`);
+
+                    const payload = {
+                        spreadsheetId,
+                        token,
+                        startRow: start,
+                        endRow: end,
+                    };
+
+                    try {
+                        const response = await fetch(gasUrl, {
+                            method: 'POST',
+                            mode: 'no-cors', // Changed to no-cors
+                            cache: 'no-cache',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify(payload),
+                            redirect: 'follow'
+                        });
+                        
+                        // Note: With 'no-cors', we can't access response details like status or body.
+                        // We assume the request was sent successfully if no network error was thrown.
+                        log(`  -> リクエスト成功: ${start}-${end}行`, 'green');
+                        successCount++;
+
+                    } catch (error) {
+                        log(`  -> リクエストエラー: ${start}-${end}行 - ${error.message}`, 'red');
+                        errorCount++;
+                    }
+                    
+                    // Add a small delay to avoid overwhelming the server
+                    await new Promise(resolve => setTimeout(resolve, 200)); 
+                }
+            } finally {
+                log('--------------------', 'blue');
+                log('すべての処理が完了しました。', 'blue');
+                log(`成功: ${successCount}件, エラー: ${errorCount}件`, 'blue');
+                executeButton.disabled = false;
+                stopButton.disabled = true;
+            }
+        });
+    </script>
+</body>
+</html>
