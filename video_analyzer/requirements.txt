@@ -1,0 +1,7 @@
+google-generativeai
+gspread
+google-auth-oauthlib
+google-auth-httplib2
+gspread-dataframe
+tqdm
+Flask
