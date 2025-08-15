@@ -484,6 +484,17 @@ def stop_analysis_route():
 # ==============================================================================
 
 if __name__ == '__main__':
+    # --- Pre-flight Check for Credentials ---
+    # Check for the secrets file before starting the server to provide a clear error.
+    secrets_path = Path("credentials/client_secrets.json")
+    if not secrets_path.is_file():
+        print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!", file=sys.stderr)
+        print("!!! FATAL ERROR: Credentials file not found.", file=sys.stderr)
+        print(f"!!! Expected to find '{secrets_path.name}' inside the '{secrets_path.parent.name}' directory.", file=sys.stderr)
+        print("!!! Please follow the setup instructions in README.md to create it.", file=sys.stderr)
+        print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!", file=sys.stderr)
+        sys.exit(1)
+
     # 'spawn' is the safest start method for macOS and Windows.
     # It avoids threading-related crashes inside the web server.
     multiprocessing.set_start_method('spawn', force=True)
