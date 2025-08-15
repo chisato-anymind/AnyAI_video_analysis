@@ -52,3 +52,227 @@ messages:
       6) 競合モーダルの衝突はpriority_rulesで解決し、evidenceに根拠を併記。
       # 出力
       json_schemaに厳密に適合する**JSON Lines**のみを返すこと（前置き・後置き禁止）。
+
+
+
+
+
+4:17
+
+validation:
+  json_schema: |
+    {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "$id": "https://example.com/vrt.schema.json",
+      "title": "Video Reconstruction Transcript (VRT)",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["video_id","records","header"],
+      "properties": {
+        "video_id": { "type": "string", "minLength": 1 },
+        "header": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["fps","sr","duration_sec","color_space","edl_timebase"],
+          "properties": {
+            "fps": { "type": "number" },
+            "sr": { "type": "integer" },
+            "duration_sec": { "type": "number" },
+            "color_space": { "type": "string" },
+            "edl_timebase": { "type": "string", "enum": ["ms"] }
+          }
+        },
+        "records": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              { "$ref": "#/$defs/IRecord" },
+              { "$ref": "#/$defs/DeltaRecord" },
+              { "$ref": "#/$defs/EventRecord" },
+              { "$ref": "#/$defs/PhonemeRecord" }
+            ]
+          }
+        }
+      },
+      "$defs": {
+        "Evidence": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["source_modality"],
+          "properties": {
+            "source_modality": { "type": "string", "enum": ["audio","video","ocr","fusion"] },
+            "audio_snippet": { "type": "string" },
+            "ocr_snippet": { "type": "string" },
+            "frame_range": {
+              "type": "array", "items": { "type": "integer" }, "minItems": 2, "maxItems": 2
+            },
+            "bbox": { "type": "array", "items": { "type": "number" }, "minItems": 4, "maxItems": 4 }
+          }
+        },
+        "CommonTrack": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+            "evidence": { "$ref": "#/$defs/Evidence" }
+          }
+        },
+        "VideoParams": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "camera": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "fov_deg": { "type": "number" },
+                "lens": {
+                  "type": "object",
+                  "properties": {
+                    "type": { "type": "string" },
+                    "distortion": {
+                      "type": "object",
+                      "properties": { "k1": { "type":"number" }, "k2": { "type":"number" }, "k3": { "type":"number" } },
+                      "additionalProperties": false
+                    }
+                  },
+                  "additionalProperties": true
+                },
+                "exposure": {
+                  "type":"object",
+                  "properties": { "iso":{"type":"number"}, "shutter":{"type":"number"}, "nd":{"type":"number"} },
+                  "additionalProperties": false
+                },
+                "white_balance": { "type": "object", "properties": { "k":{ "type":"number" }, "tint":{"type":"number"} }, "additionalProperties": false }
+              }
+            },
+            "camera_motion": { "type":"object", "properties": { "pan":{"type":"number"}, "tilt":{"type":"number"}, "roll":{"type":"number"}, "zoom":{"type":"number"}, "dur_ms":{"type":"integer"} }, "additionalProperties": false },
+            "composition": { "type":"object", "properties": { "subjects":{"type":"array"}, "bbox":{"type":"array","items":{"type":"number"}} }, "additionalProperties": true },
+            "lighting": { "type":"object", "properties": { "intensity_est_lux":{"type":"number"}, "color_temp":{"type":"number"} }, "additionalProperties": true },
+            "grade": { "type":"object", "properties": { "exposure":{"type":"number"}, "contrast":{"type":"number"}, "saturation":{"type":"number"}, "temperature":{"type":"number"}, "tint":{"type":"number"}, "lut_name":{"type":"string"} }, "additionalProperties": true },
+            "speed_ramp": { "type":"object", "properties": { "curve":{"type":"string"}, "keyframes":{"type":"array"} }, "additionalProperties": true },
+            "grain": { "type":"object", "properties": { "strength":{"type":"number"}, "size":{"type":"number"} }, "additionalProperties": false },
+            "vignette": { "type":"object", "properties": { "amount":{"type":"number"} }, "additionalProperties": false },
+            "sharpness": { "type":"number" }
+          }
+        },
+        "GraphicParams": {
+          "type":"object",
+          "additionalProperties": false,
+          "required": ["text"],
+          "properties": {
+            "id": { "type":"string" },
+            "text": { "type":"string" },
+            "lang": { "type":"string" },
+            "font": { "type":"object", "properties": { "family":{"type":"string"}, "fallback":{"type":"array","items":{"type":"string"}}, "weight":{"type":"integer"}, "style":{"type":"string"}, "tracking":{"type":"number"}, "leading":{"type":"number"}, "kerning":{"type":"number"} }, "additionalProperties": true },
+            "layout": { "type":"object", "properties": { "anchor":{"type":"string"}, "x":{"type":"number"}, "y":{"type":"number"}, "w":{"type":"number"}, "h":{"type":"number"}, "align":{"type":"string"}, "margin":{"type":"number"} }, "additionalProperties": true },
+            "fill": { "type":"object", "properties": { "rgba":{"type":"string", "pattern":"^#[0-9A-Fa-f]{8}$"} }, "additionalProperties": false },
+            "stroke": { "type":"object", "properties": { "rgba":{"type":"string", "pattern":"^#[0-9A-Fa-f]{8}$"}, "width":{"type":"number"} }, "additionalProperties": false },
+            "shadow": { "type":"object", "properties": { "rgba":{"type":"string", "pattern":"^#[0-9A-Fa-f]{8}$"}, "blur":{"type":"number"}, "offset":{"type":"number"} }, "additionalProperties": false },
+            "anim": { "type":"object", "properties": { "in":{"type":"object"}, "out":{"type":"object"} }, "additionalProperties": true },
+            "blend_mode": { "type":"string" },
+            "z_index": { "type":"integer" }
+          }
+        },
+        "AudioParams": {
+          "type":"object",
+          "additionalProperties": false,
+          "properties": {
+            "speaker": { "type":"object", "properties": { "id":{"type":"string"}, "gender":{"type":"string"}, "age_range":{"type":"string"}, "accent":{"type":"string"} }, "additionalProperties": true },
+            "music": { "type":"object", "properties": { "genre":{"type":"string"}, "timbre_tokens":{"type":"array","items":{"type":"string"}}, "tempo_bpm":{"type":"number"}, "key":{"type":"string"}, "mode":{"type":"string"}, "chord_progression":{"type":"array","items":{"type":"string"}}, "structure":{"type":"array"}, "instrumentation":{"type":"array","items":{"type":"string"}}, "mix":{"type":"object","properties":{"stereo_width":{"type":"number"}, "reverb":{"type":"object"}, "compression":{"type":"object"}} } }, "additionalProperties": true },
+            "sfx_list": { "type":"array", "items": { "type":"object", "properties": { "label":{"type":"string"}, "t":{"type":"integer"}, "stereo_pos":{"type":"number","minimum":-1,"maximum":1}, "env":{"type":"object"}, "envelope":{"type":"object","properties":{"attack":{"type":"number"},"decay":{"type":"number"},"sustain":{"type":"number"},"release":{"type":"number"}} } }, "additionalProperties": true } }
+          }
+        },
+        "IRecord": {
+          "type":"object",
+          "additionalProperties": false,
+          "required": ["t","I"],
+          "properties": {
+            "t": { "type":"integer", "minimum": 0 },
+            "I": {
+              "type":"object",
+              "additionalProperties": false,
+              "properties": {
+                "v": { "$ref": "#/$defs/VideoParams" },
+                "g": { "type":"array", "items": { "$ref": "#/$defs/GraphicParams" } },
+                "a": { "$ref": "#/$defs/AudioParams" }
+              }
+            },
+            "confidence": { "type":"number", "minimum":0, "maximum":1 },
+            "evidence": { "$ref": "#/$defs/Evidence" }
+          }
+        },
+        "DeltaRecord": {
+          "type":"object",
+          "additionalProperties": false,
+          "required": ["t","Δ"],
+          "properties": {
+            "t": { "type":"integer", "minimum": 0 },
+            "Δ": {
+              "type":"object",
+              "additionalProperties": true,
+              "properties": {
+                "v": { "$ref": "#/$defs/VideoParams" },
+                "g": { "type":"array", "items": { "$ref": "#/$defs/GraphicParams" } },
+                "a": { "$ref": "#/$defs/AudioParams" }
+              }
+            },
+            "confidence": { "type":"number", "minimum":0, "maximum":1 },
+            "evidence": { "$ref": "#/$defs/Evidence" }
+          }
+        },
+        "EventRecord": {
+          "type":"object",
+          "additionalProperties": false,
+          "required": ["t","event","payload","confidence","evidence"],
+          "properties": {
+            "t": { "type":"integer", "minimum":0 },
+            "event": {
+              "type":"string",
+              "enum": [
+                "cta_appears","price_shown","logo_visible","sku_visible",
+                "claim_stated","comparison_stated","gesture","facial_expression",
+                "camera_pan","camera_tilt","transition","effect","beat_hit"
+              ]
+            },
+            "payload": { "type":"object", "additionalProperties": true },
+            "confidence": { "type":"number", "minimum":0, "maximum":1 },
+            "evidence": { "$ref": "#/$defs/Evidence" }
+          }
+        },
+        "PhonemeRecord": {
+          "type":"object",
+          "additionalProperties": false,
+          "required": ["t","a_ph","confidence","evidence"],
+          "properties": {
+            "t": { "type":"integer", "minimum":0 },
+            "a_ph": {
+              "type":"object",
+              "additionalProperties": false,
+              "required": ["ipa"],
+              "properties": {
+                "ipa": { "type":"string" },
+                "f0_mean": { "type":"number" },
+                "f0_curve": { "type":"array", "items": { "type":"number" } },
+                "energy": { "type":"number" },
+                "formants": { "type":"array", "items": { "type":"number" } },
+                "breathiness": { "type":"number" },
+                "jitter": { "type":"number" },
+                "shimmer": { "type":"number" }
+              }
+            },
+            "confidence": { "type":"number", "minimum":0, "maximum":1 },
+            "evidence": { "$ref": "#/$defs/Evidence" }
+          }
+        }
+      }
+    }
+
+guardrails:
+  - "出力は**JSONまたはJSON Linesのみ**。先頭・末尾の余計な文字や説明は厳禁。"
+  - "必須フィールド欠落・型不一致・未知キーがあれば、そのレコードは生成しない。"
+
+notes:
+  - "上記few_shotは1レコード配列として示したが、実運用は**1行=1レコード**のJSONLを推奨。"
+  - "イベントのenumやパラメータは必要に応じ拡張可。ただしjson_schema更新と整合性を保つこと。"
+  - "I/Δの差分は"変更点のみ"を記述。丸めはsettings.decimal_placesに従う。"

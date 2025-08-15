@@ -204,7 +204,22 @@ def analyze_with_gemini(model, video_file, prompt_text: str, log_q: multiprocess
     log_message(f"   - Analyzing {video_file.name} with Gemini...", queue=log_q)
     try:
         response = model.generate_content([prompt_text, video_file], request_options={'timeout': 600})
+        
+        # --- Safety Check ---
+        # Before accessing response.text, check if the API returned a valid candidate.
+        if not response.candidates:
+            # If no candidates, the prompt was likely blocked.
+            block_reason = response.prompt_feedback.block_reason.name if response.prompt_feedback else "Unknown"
+            error_message = f"SKIPPED - Analysis blocked by API. Reason: {block_reason}"
+            log_message(f"   - {error_message}", is_error=True, queue=log_q)
+            return error_message
+
         return response.text.strip()
+    except ValueError as e:
+        # This can happen if the response is empty for other reasons.
+        log_message(f"   - Error during Gemini analysis (ValueError): {e}", is_error=True, queue=log_q)
+        block_reason = response.prompt_feedback.block_reason.name if response.prompt_feedback else "Unknown"
+        return f"ERROR - Invalid response from API. Reason: {block_reason}"
     except Exception as e:
         log_message(f"   - Error during Gemini analysis: {e}", is_error=True, queue=log_q)
         raise
