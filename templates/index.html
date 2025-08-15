@@ -81,11 +81,21 @@
 
                 <div class="row">
                     <div class="col-md-6">
-                        <label for="model-name" class="form-label">Gemini Model</label>
-                        <select class="form-select" id="model-name">
-                            <option value="gemini-1.5-flash" selected>Flash (Faster)</option>
-                            <option value="gemini-1.5-pro">Pro (Higher Quality)</option>
-                        </select>
+                        <label class="form-label d-block">Gemini Model</label>
+                        <div class="bg-white p-3 rounded border mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="model-name" id="model-flash" value="gemini-2.5-flash" checked>
+                                <label class="form-check-label" for="model-flash">
+                                    Flash (Faster)
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="model-name" id="model-pro" value="gemini-2.5-pro">
+                                <label class="form-check-label" for="model-pro">
+                                    Pro (Higher Quality)
+                                </label>
+                            </div>
+                        </div>
                     </div>
                     <div class="col-md-6">
                         <label for="workers" class="form-label">Batch</label>
@@ -93,7 +103,7 @@
                     </div>
                 </div>
 
-                <div>
+                <div class="mt-4">
                     <button type="submit" class="btn btn-primary" id="run-button">Run Analysis</button>
                     <button type="button" class="btn btn-secondary" id="stop-button" disabled>Stop</button>
                 </div>
@@ -154,7 +164,7 @@
                 output_col_letter: document.getElementById('output-col-letter').value,
                 start_row: document.getElementById('start-row').value,
                 end_row: document.getElementById('end-row').value,
-                model_name: document.getElementById('model-name').value,
+                model_name: document.querySelector('input[name="model-name"]:checked').value,
                 workers: document.getElementById('workers').value,
             };
 
