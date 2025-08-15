@@ -54,7 +54,7 @@ load_dotenv()
 # --- Global Configuration & State ---
 # ==============================================================================
 
-app = Flask(__name__, template_folder='templates')
+app = Flask(__name__, template_folder='../templates')
 
 # --- Analysis Task State ---
 # These variables manage the background processing thread
@@ -118,7 +118,8 @@ def extract_drive_file_id_from_url(url: str) -> Optional[str]:
 
 def get_google_creds(client_secrets_file: str, log_q: multiprocessing.Queue) -> Optional[Credentials]:
     creds = None
-    token_path = Path("token.json")
+    # Look for token in the parent directory's credentials folder
+    token_path = Path("../credentials/token.json")
     if token_path.exists():
         try:
             creds = Credentials.from_authorized_user_file(str(token_path), SHEET_SCOPES)
@@ -369,9 +370,13 @@ def analysis_main_logic(config: dict, log_q: multiprocessing.Queue):
 # ==============================================================================
 
 def find_client_secrets_file() -> Optional[Path]:
-    for f in Path(".").glob("*.json"):
-        if "token.json" not in f.name.lower():
-             return f
+    # Look in the credentials directory first, then the parent directory
+    search_dirs = [Path("../credentials"), Path("../")]
+    for directory in search_dirs:
+        for f in directory.glob("*.json"):
+            # A simple heuristic to avoid matching the token file
+            if "token" not in f.name.lower() and "client" in f.name.lower() or "secret" in f.name.lower():
+                 return f
     return None
 
 @app.route('/')
@@ -406,7 +411,7 @@ def run_analysis_route():
             "model": data['model_name'],
             "workers": int(data.get('workers', 10)), # Default to 10 workers
             "max_wait": 900,
-            "prompt_file": "prompt.txt",
+            "prompt_file": "../config/prompt.txt",
             "client_secrets": str(client_secrets_path)
         }
     except (ValueError, TypeError):

@@ -11,3 +11,4 @@ token.json
 .DS_Store
 AnyAgent_OAuth_1.json
 video_analyzer/token.json
+credentials/
