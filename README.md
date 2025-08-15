@@ -38,23 +38,25 @@ The project is already configured to keep this file private and will not commit 
 
 ### Step 4: Install Dependencies and Run
 
-1.  Create and activate a Python virtual environment:
+1.  Open the **Terminal** app on your Mac.
+2.  **Navigate to the project folder.** A simple way to do this is to type `cd ` (with a space after it) into the terminal, and then drag the `AnyAI_video_analysis` folder from Finder directly onto the terminal window. Press Enter.
+3.  **Create and activate a Python virtual environment:**
     ```bash
     python3 -m venv .venv
     source .venv/bin/activate
     ```
-2.  Install the required packages:
+4.  **Install the required packages:**
     ```bash
     pip install -r requirements.txt
     ```
-3.  Create a `.env` file in the root of the project and add your Gemini API key:
+5.  **Create a `.env` file** in the root of the project and add your Gemini API key:
     ```
     GEMINI_API_KEY="YOUR_API_KEY_HERE"
     ```
-4.  Run the application:
-    ```bash
-    ./start.sh
-    ```
+6.  **Run the application:**
+    -   From now on, you can simply **double-click the `start.command`** file in the project folder.
+    -   This will open a new terminal window, start the server, and open the web interface in your browser.
+    -   To stop the server, just close the terminal window.
 
 ### First Run Authentication
 
