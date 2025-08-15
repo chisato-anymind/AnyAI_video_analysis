@@ -17,6 +17,7 @@ import concurrent.futures
 from typing import Optional
 import mimetypes
 import multiprocessing
+from queue import Empty
 
 import uuid
 
@@ -209,7 +210,7 @@ def analyze_with_gemini(model, video_file, prompt_text: str, log_q: multiprocess
         raise
 
 def process_video_task_worker_wrapper(args):
-    """Helper to unpack arguments for imap_unordered."""
+    """Helper function to unpack arguments for use with imap_unordered."""
     return process_video_task_worker(*args)
 
 def process_video_task_worker(task_info: dict, config: dict, log_q: multiprocessing.Queue):
@@ -339,7 +340,7 @@ def analysis_main_logic(config: dict, log_q: multiprocessing.Queue):
         with multiprocessing.Pool(processes=config["workers"]) as pool:
             log_message(f"[+] Pool started with {config['workers']} processes. Processing {len(tasks)} tasks...", queue=log_q)
             
-            # Use imap_unordered to get results as they are completed
+            # Use imap_unordered with the wrapper to get results as they are completed
             results_iterator = pool.imap_unordered(process_video_task_worker_wrapper, worker_args)
             
             for row_idx, result_text in results_iterator:
@@ -465,23 +466,25 @@ def stream_logs():
     def generate():
         while True:
             try:
-                # Block until a message is available or timeout
-                message = log_queue.get(timeout=1.0)
+                # Block until a message is available or timeout after 2 seconds
+                message = log_queue.get(timeout=2.0)
                 if message == "---PROCESS_COMPLETE---":
-                    yield "event: complete\ndata: Analysis complete.\n\n"
+                    # This is the definitive signal that the process is done.
+                    yield "event: complete\ndata: Analysis process finished.\n\n"
                     break
                 yield f"data: {message}\n\n"
-            except multiprocessing.queues.Empty:
-                # Check if the process is still alive
+            except Empty:
+                # The queue was empty for our timeout period.
+                # Let's check if the process is still running.
                 if not analysis_process or not analysis_process.is_alive():
-                    # Drain any final messages
-                    while not log_queue.empty():
-                        message = log_queue.get()
-                        if message == "---PROCESS_COMPLETE---":
-                            break
-                        yield f"data: {message}\n\n"
-                    yield "event: complete\ndata: Analysis complete.\n\n"
+                    # The process died without sending the 'complete' signal.
+                    # This is an abnormal termination.
+                    yield "event: error\ndata: Log stream connection lost (process terminated unexpectedly).\n\n"
                     break
+                else:
+                    # The process is still alive, just quiet. Send a keep-alive comment.
+                    # This prevents some proxies/browsers from closing the connection.
+                    yield ": keep-alive\n\n"
     
     return Response(generate(), mimetype='text/event-stream')
 

@@ -1,10 +1,22 @@
 #!/bin/bash
 
-# This script starts the web server using the correct Python from the virtual environment.
-
 # Get the directory where the script is located
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd)
 
-# Activate the virtual environment and run the server directly
+echo "Activating virtual environment..."
+# Activate the virtual environment
+source "$SCRIPT_DIR/.venv/bin/activate"
+
+# Check if activation was successful
+if ! command -v python &> /dev/null
+then
+    echo "Could not activate the virtual environment. Please re-create it."
+    exit 1
+fi
+
 echo "Starting the web server..."
-"$SCRIPT_DIR/.venv/bin/python3" "$SCRIPT_DIR/server.py"
+# Run the server script from its new location in the src/ directory
+python "$SCRIPT_DIR/src/server.py"
+
+# Deactivate the virtual environment when the server stops
+deactivate

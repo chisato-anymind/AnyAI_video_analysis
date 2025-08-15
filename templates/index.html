@@ -199,7 +199,12 @@
                 };
 
                 eventSource.addEventListener('error', function(event) {
-                    log('-> Log stream connection lost. The process may have finished or an error occurred.', true);
+                    // If the server sends a custom error message, event.data will exist.
+                    if (event.data) {
+                        log(`-> ${event.data}`, true);
+                    } else {
+                        log('-> Log stream connection lost. The process may have finished or a network error occurred.', true);
+                    }
                     eventSource.close();
                     finalizeUI();
                 });
