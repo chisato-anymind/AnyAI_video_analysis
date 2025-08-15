@@ -208,6 +208,10 @@ def analyze_with_gemini(model, video_file, prompt_text: str, log_q: multiprocess
         log_message(f"   - Error during Gemini analysis: {e}", is_error=True, queue=log_q)
         raise
 
+def process_video_task_worker_wrapper(args):
+    """Helper to unpack arguments for imap_unordered."""
+    return process_video_task_worker(*args)
+
 def process_video_task_worker(task_info: dict, config: dict, log_q: multiprocessing.Queue):
     """
     This function runs in a separate process.
@@ -327,23 +331,48 @@ def analysis_main_logic(config: dict, log_q: multiprocessing.Queue):
         # Create a list of arguments for each worker
         worker_args = [(task, config, log_q) for task in tasks]
 
+        # --- Process tasks and write results in batches ---
+        BATCH_SIZE = 10  # Write to the sheet every 10 results
+        update_requests = []
+        tasks_processed = 0
+
         with multiprocessing.Pool(processes=config["workers"]) as pool:
-            log_message(f"[+] Pool started with {config['workers']} processes.", queue=log_q)
-            results = pool.starmap(process_video_task_worker, worker_args)
-        
+            log_message(f"[+] Pool started with {config['workers']} processes. Processing {len(tasks)} tasks...", queue=log_q)
+            
+            # Use imap_unordered to get results as they are completed
+            results_iterator = pool.imap_unordered(process_video_task_worker_wrapper, worker_args)
+            
+            for row_idx, result_text in results_iterator:
+                tasks_processed += 1
+                log_message(f"  -> Result received for row {row_idx} ({tasks_processed}/{len(tasks)} complete).", queue=log_q)
+                
+                update_requests.append({
+                    'range': gspread.utils.rowcol_to_a1(row_idx, output_col_num),
+                    'values': [[result_text]],
+                })
+
+                # If the batch is full, write to the sheet
+                if len(update_requests) >= BATCH_SIZE:
+                    log_message(f"  -> Writing batch of {len(update_requests)} results to the sheet...", queue=log_q)
+                    try:
+                        output_ws.batch_update(update_requests)
+                        log_message("  -> Batch write successful.", queue=log_q)
+                        update_requests = []  # Clear the batch
+                    except Exception as e:
+                        log_message(f"  -> WARNING: Failed to write batch to sheet: {e}", is_error=True, queue=log_q)
+
         log_message("[+] Multiprocessing pool finished.", queue=log_q)
         
-        log_message("[6] Writing all results to the sheet...", queue=log_q)
-        update_requests = []
-        for row_idx, result_text in results:
-            update_requests.append({
-                'range': gspread.utils.rowcol_to_a1(row_idx, output_col_num),
-                'values': [[result_text]],
-            })
-        
+        # Write any remaining results in the last batch
         if update_requests:
-            output_ws.batch_update(update_requests)
-        log_message("[+] All results written to the sheet.", queue=log_q)
+            log_message(f"-> Writing final batch of {len(update_requests)} results to the sheet...", queue=log_q)
+            try:
+                output_ws.batch_update(update_requests)
+                log_message("-> Final batch write successful.", queue=log_q)
+            except Exception as e:
+                log_message(f"-> WARNING: Failed to write final batch to sheet: {e}", is_error=True, queue=log_q)
+
+        log_message("[+] All results have been processed and written.", queue=log_q)
 
     except Exception as e:
         log_message(f"\n--- A FATAL ERROR occurred in the background process: {e} ---", is_error=True, queue=log_q)
