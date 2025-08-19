@@ -20,6 +20,7 @@ import multiprocessing
 from queue import Empty
 
 import uuid
+import webview
 
 # --- Flask and Environment Imports ---
 from flask import Flask, request, jsonify, Response, render_template
@@ -521,6 +522,35 @@ def stop_analysis_route():
     log_message("-> Analysis process terminated.")
     return jsonify({"status": "success", "message": "Stop signal sent. The analysis has been terminated."} )
 
+@app.route('/api/setup_status')
+def setup_status():
+    """Checks if the Gemini API key is present."""
+    api_key_set = bool(os.getenv('GEMINI_API_KEY'))
+    return jsonify({'api_key_set': api_key_set})
+
+@app.route('/api/save_api_key', methods=['POST'])
+def save_api_key():
+    """Saves the provided Gemini API key to the .env file."""
+    data = request.json
+    api_key = data.get('api_key')
+
+    if not api_key or not isinstance(api_key, str):
+        return jsonify({'error': 'Invalid API key provided.'}), 400
+
+    try:
+        # Ensure the .env file exists, then write/overwrite the key
+        with open('.env', 'w') as f:
+            f.write(f'GEMINI_API_KEY={api_key.strip()}\n')
+        
+        # Reload the environment variables for the current process
+        load_dotenv(override=True)
+        
+        return jsonify({'status': 'success', 'message': 'API Key saved.'})
+    except Exception as e:
+        log_message(f"Error saving API key: {e}", is_error=True)
+        return jsonify({'error': 'Failed to save API key to .env file.'}), 500
+
+
 
 # ==============================================================================
 # --- Server Startup ---
@@ -528,35 +558,29 @@ def stop_analysis_route():
 
 if __name__ == '__main__':
     # --- Pre-flight Check for Credentials ---
-    # Check for the secrets file before starting the server to provide a clear error.
     secrets_path = Path("credentials/client_secrets.json")
     if not secrets_path.is_file():
-        print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!", file=sys.stderr)
-        print("!!! FATAL ERROR: Credentials file not found.", file=sys.stderr)
-        print(f"!!! Expected to find '{secrets_path.name}' inside the '{secrets_path.parent.name}' directory.", file=sys.stderr)
-        print("!!! Please follow the setup instructions in README.md to create it.", file=sys.stderr)
-        print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!", file=sys.stderr)
-        sys.exit(1)
+        # In a GUI app, printing to stderr is not useful.
+        # We can show an error using pywebview's alert system.
+        # This will be handled gracefully by the window creation logic.
+        pass
 
-    # 'spawn' is the safest start method for macOS and Windows.
-    # It avoids threading-related crashes inside the web server.
+    # 'spawn' is required for multiprocessing to be safe in a bundled app.
     multiprocessing.set_start_method('spawn', force=True)
 
-    # A Manager is required to share a queue between processes when using 'spawn'.
-    with multiprocessing.Manager() as manager:
-        # Create a manager-owned queue
-        log_queue = manager.Queue()
+    # Create a manager-owned queue for inter-process communication
+    # This needs to be done before the webview window is created
+    manager = multiprocessing.Manager()
+    log_queue = manager.Queue()
+    app.config['log_queue'] = log_queue
 
-        if not os.getenv('GEMINI_API_KEY'):
-            print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!", file=sys.stderr)
-            print("!!! WARNING: GEMINI_API_KEY is not set in your .env file.", file=sys.stderr)
-            print("!!! The analysis script will fail without it.", file=sys.stderr)
-            print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!", file=sys.stderr)
-
-        print("-> Starting integrated web server and analysis engine...")
-        print("-> To use the dashboard, open your browser to http://127.0.0.1:5001")
-        
-        # This is a bit of a hack to pass the queue to the Flask app
-        app.config['log_queue'] = log_queue
-        
-        app.run(host='0.0.0.0', port=5001, debug=False)
+    # Create and start the pywebview window.
+    # pywebview will run the Flask app in a separate thread.
+    webview.create_window(
+        'AnyAI Video Analysis',
+        app,
+        width=1200,
+        height=800,
+        resizable=True
+    )
+    webview.start()
