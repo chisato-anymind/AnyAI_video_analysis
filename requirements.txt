@@ -13,3 +13,4 @@ pyobjc-framework-WebKit
 pyinstaller-hooks-contrib
 pyinstaller
 waitress
+requests

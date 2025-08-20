@@ -20,9 +20,17 @@ import uuid
 
 # --- Third-Party Imports ---
 import webview
+import requests # For checking for new versions
 from waitress import serve
 from flask import Flask, request, jsonify, Response, render_template
 from dotenv import load_dotenv
+
+# --- App Version and Update Config ---
+APP_VERSION = "1.0.0"
+# IMPORTANT: Replace with your actual GitHub username and repository name
+VERSION_URL = "https://raw.githubusercontent.com/chisato-anymind/AnyAI_video_analysis/main/version.txt"
+RELEASES_URL = "https://github.com/chisato-anymind/AnyAI_video_analysis/releases"
+
 
 # --- Google & Gemini API Imports ---
 try:
@@ -347,16 +355,50 @@ def run_server():
     # Use waitress for a production-ready, stable server
     serve(app, host='127.0.0.1', port=5000)
 
+def check_for_updates(window):
+    """Check for a new version on GitHub in a background thread."""
+    try:
+        log_message("Checking for updates...")
+        response = requests.get(VERSION_URL, timeout=5)
+        response.raise_for_status()
+        latest_version = response.text.strip()
+
+        # Simple version comparison
+        if latest_version > APP_VERSION:
+            log_message(f"New version found: {latest_version}. Current version: {APP_VERSION}")
+            # This function must be called on the main thread, api.create_confirmation_dialog handles that
+            result = window.create_confirmation_dialog(
+                'Update Available',
+                f'A new version ({latest_version}) is available. You are using {APP_VERSION}.\n\nWould you like to go to the download page?'
+            )
+            if result:
+                import webbrowser
+                webbrowser.open(RELEASES_URL)
+        else:
+            log_message("Application is up to date.")
+
+    except requests.RequestException as e:
+        log_message(f"Could not check for updates: {e}", is_error=True)
+    except Exception as e:
+        log_message(f"An unexpected error occurred during update check: {e}", is_error=True)
+
+
 if __name__ == '__main__':
     server_thread = threading.Thread(target=run_server)
     server_thread.daemon = True
     server_thread.start()
 
-    webview.create_window(
+    window = webview.create_window(
         'AnyAI Video Analysis',
         'http://127.0.0.1:5000',
         width=1200,
         height=800,
         resizable=True
     )
+    
+    # Run the update check a few seconds after startup
+    update_thread = threading.Timer(3.0, check_for_updates, args=(window,))
+    update_thread.daemon = True
+    update_thread.start()
+
     webview.start(gui='cocoa') # Force cocoa backend for stability
