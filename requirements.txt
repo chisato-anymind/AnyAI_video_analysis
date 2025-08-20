@@ -7,3 +7,9 @@ google-api-python-client
 google-generativeai
 tenacity
 pywebview
+pyobjc-core
+pyobjc-framework-Cocoa
+pyobjc-framework-WebKit
+pyinstaller-hooks-contrib
+pyinstaller
+waitress
