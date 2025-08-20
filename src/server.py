@@ -56,7 +56,7 @@ load_dotenv()
 # --- Global Configuration & State ---
 # ==============================================================================
 
-app = Flask(__name__, template_folder='../templates')
+app = Flask(__name__, template_folder='../templates', static_folder='../static')
 
 # --- Analysis Task State ---
 # These variables manage the background processing thread

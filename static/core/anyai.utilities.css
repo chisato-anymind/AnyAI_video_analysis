@@ -1,0 +1,14 @@
+
+/* anyai.utilities.css — 便利クラス（必要に応じて追加） */
+.mt-0{margin-top:0}.mb-0{margin-bottom:0}
+.mt-3{margin-top:var(--anyai-space-3)}.mb-3{margin-bottom:var(--anyai-space-3)}
+.mt-5{margin-top:var(--anyai-space-5)}.mb-5{margin-bottom:var(--anyai-space-5)}
+.p-4{padding:var(--anyai-space-4)}.p-5{padding:var(--anyai-space-5)}
+.center{display:flex;justify-content:center;align-items:center}
+.stack{display:flex;flex-direction:column;gap:var(--anyai-space-4)}
+.row{display:flex;gap:var(--anyai-space-3);align-items:center;flex-wrap:wrap}
+.right{margin-left:auto}
+.w-100{width:100%}
+.max-lg{max-width:var(--anyai-content-lg);margin-inline:auto}
+.text-subtle{color:var(--anyai-text-subtle)}
+.text-danger{color:var(--anyai-danger)}.text-success{color:var(--anyai-success)}
