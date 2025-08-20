@@ -13,3 +13,12 @@ AnyAgent_OAuth_1.json
 video_analyzer/token.json
 credentials/
 AnyAI_UI_Master/
+
+# Ignore build artifacts and distribution files
+build/
+dist/
+*.dmg
+
+# Ignore Python cache
+__pycache__/
+*.pyc
